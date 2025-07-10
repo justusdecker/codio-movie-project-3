@@ -5,119 +5,54 @@ import matplotlib.pyplot as plt
 from bin.constants import *
 from bin.modules import *
 
-from os.path import isfile
-from json import load, dumps, JSONDecodeError
+import bin.data_access as storage
 
-from bin.data_access import add_movie, list_movies
+from bin.api_access import get_movie
 
-class Movie:
-
-    def __init__(self,movie_data: dict):
-        self.movie_data = movie_data
-
-    def asdict(self) -> dict:
-        """
-        Returns a dictionary representation of the movie's core attributes.
-
-        This method is useful for serializing the movie object, e.g., for saving
-        to a file or sending over a network, ensuring a consistent structure.
-        It explicitly returns the 'title', 'rating', and 'release_year'
-        properties.
-        """
-        return {
-            'title': self.title,
-            'rating': self.rating,
-            'release_year': self.release_year
-        }
-    
-    @property
-    def title(self) -> str:
-        """ Gets the title of the movie. Defaults to 'n.a.' if not set. """
-        return self.movie_data.get('title','n.a.')
-    @title.setter
-    def title(self, value: str):
-        self.movie_data['title'] = value
-    @property
-    def rating(self) -> int:
-        """ Gets the rating of the movie. Defaults to 0 if not set. """
-        return self.movie_data.get('rating',0)
-    @rating.setter
-    def rating(self, value: int):
-        self.movie_data['rating'] = value
-    @property
-    def release_year(self) -> int:
-        """ Gets the release year of the movie. Defaults to 0 if not set. """
-        return self.movie_data.get('release_year',0)
-    @release_year.setter
-    def release_year(self, value: int):
-        self.movie_data['release_year'] = value
-    
-MAX_RATING = 10
 class MovieRank:
     def __init__(self):
         self.isrunning = True
-        self.load_movies()
 
     @property
     def titles(self) -> list[str]:
-        return [i.title for i in self.movies]
-
-    def save_movies(self):
-        """
-        Gets all your movies as an argument and saves them to the JSON file.
-        """
-        with open(f'movies.json', 'w') as file_write:
-            file_write.write(dumps([movie.asdict() for movie in self.movies],indent=4))
+        return [i for i in storage.list_movies()]
     
-    def load_movies(self):
-        """
-        loads a list of dictionaries that
-        contains the movies information in the database into `self.movies`
-        """
-        self.movies: list[Movie] = []
-        file_name = f'movies.json'
-        if isfile(file_name):
-            try:
-                with open(file_name) as file_read:
-                    movies_json = load(file_read)
-                    if not isinstance(movies_json,list):
-                        raise TypeError()
-                    self.movies = [Movie(movie) for movie in movies_json]
-                    
-            except JSONDecodeError:
-                print(f'Cant load from file: {file_name} ERROR: JSONDE')
-            except TypeError:
-                print(f'Cant load from file: {file_name} ERROR: TE')
-        
+    #TODO Movies
     
     def list_movies(self):
-
-        print(f"Movies in total: {len(self.movies)}")
+        movies = storage.list_movies()
+        print(f"Movies in total: {len(movies)}")
         print(f"{'Movie':<45} {'Rating':<7} {'Release':<7}")
-        for movie in self.movies:
-            print(f"{movie.title:<45} {movie.rating:<7} {movie.release_year}")
+        for movie in movies:
+            print(f"{movie:<45} {movies[movie][RATING]:<7} {movies[movie][YEAR]}")
             
     def add_movie(self):
         
         title =  get_user_input_colorized("Movie title: ")
-        rating = convert_to_float(get_user_input_colorized("Movie rating: "))
-        release_year = convert_to_float(get_user_input_colorized("Movie release year: "))
+        #rating = convert_to_float(get_user_input_colorized("Movie rating: "))
+        #release_year = convert_to_float(get_user_input_colorized("Movie release year: "))
         
         #! ERRORHANDLING
         if not title:
             error(MSG_NO_TITLE)
-        if release_year < 1891:
-            error(MSG_KINETOSSCOPE_NOT_INVENTED_YET)
-            return
-        if not rating: 
-            error(MSG_RATING_IS_NOT_NUMERIC)
-            return
-        if rating > MAX_RATING:
-            error(MSG_WRONG_RATING)
-            return
+        movie_data = get_movie(title)
         
-        if title not in [key for key in list_movies()]:
-            add_movie(title, rating, int(release_year))
+        if movie_data['Response'] == "False":
+            error(movie_data['Error'])
+            return
+        rating = movie_data['Rated']
+        
+        rating = movie_data['imdbRating']
+        if rating == 'N/A':
+            rating = -1 # Cant get rating
+            
+        release_date = movie_data['Released']
+        if release_date == 'N/A':
+            release_date = '01 Jan 1980' # Cant get release_year
+        release_year = release_date.split(' ')[2]
+        
+        if title not in [key for key in storage.list_movies()]:
+            storage.add_movie(title, int(release_year),rating)
     
     def remove_movie(self):
         """
@@ -129,11 +64,9 @@ class MovieRank:
             error(MSG_NO_TITLE)
             
         if title in self.titles:
-            
-            self.movies.pop(self.titles.index(title))
+            storage.delete_movie(title)
         else:
             error(MSG_MOVIE_DOESNT_EXIST)
-        self.save_movies()  
          
     def edit_movie(self):
         """
@@ -157,14 +90,15 @@ class MovieRank:
             error(MSG_WRONG_RATING)
             return
         if title in self.titles:
-            self.movies[self.titles.index(title)].rating = rating
+            storage.update_movie(title,rating)
         else:
             error(MSG_MOVIE_DOESNT_EXIST)
-        self.save_movies() 
         
     def print_stats(self):
         """ print movie stats like title, rating & release_year in a formatted way """
-        ratings = [i.rating for i in self.movies]
+        movies = storage.list_movies()
+        
+        ratings = [movies[i][RATING] for i in movies]
         median = ratings.copy()
         median.sort()
         median_hlen = len(median)//2
@@ -180,13 +114,15 @@ class MovieRank:
         worst, rating_w = [],11
         best, rating_b = [],-1
         
-        for movie in self.movies:
-            if movie.rating > rating_b:
-                best.append(movie.title)
-                rating_b = movie.rating
-            if movie.rating < rating_w:
-                worst.append(movie.title)
-                rating_w = movie.rating
+        for movie in movies:
+            rating_c = movies[movie][RATING]
+            title = movie
+            if rating_c > rating_b:
+                best.append(title)
+                rating_b = rating_c
+            if rating_c < rating_w:
+                worst.append(title)
+                rating_w = rating_c
         
         print(f"Average rating: {round(average,2)}. Median rating: {median}.\n{"-"*15}")
         print(f'Best Rating{"s" if len(best) > 1 else ""}\n{"-"*15}')
@@ -198,12 +134,14 @@ class MovieRank:
         
     def print_random_movie(self):
         """ get a random movie and print it in a formatted way"""
-        rnd_movie = [i for i in self.movies][randint(0,len(self.movies)-1)]
-        print(f"{rnd_movie.title}: {rnd_movie.rating} released in: {rnd_movie.release_year}")
+        movies = storage.list_movies()
+        rnd_movie = [i for i in movies][randint(0,len(movies)-1)]
+        print(f"{rnd_movie}: {movies[rnd_movie][RATING]} released in: {int(movies[rnd_movie][YEAR])}")
     
     def print_movies_by_rank(self):
         """ get all movies by rank and print it in a formatted way"""
-        listed = [[i.rating,i.title] for i in self.movies]
+        movies = storage.list_movies()
+        listed = [[movies[i][RATING],i] for i in movies]
         listed = sorted(listed,key=lambda x: x[1],reverse=True)
         for n, r in listed:
             print(f"{r:<35} {n}/10")
@@ -211,14 +149,16 @@ class MovieRank:
         """ 
         a searching method to get movies
         """
+        movies = storage.list_movies()
         value = get_user_input_colorized("Search: ").lower()
-        for movie in self.movies:
-            if value.lower() in movie.title.lower():
-                print(f"{movie.title:<45} {movie.rating:<7} {movie.release_year}")
+        for movie in movies:
+            if value.lower() in movie.lower():
+                print(f"{movie:<45} {movies[movie][RATING]:<7} {movies[movie][YEAR]}")
 
     def plot_movies(self):
         """ Generates and displays a histogram of movie ratings. """
-        plt.hist([i.rating for i in self.movies])
+        movies = storage.list_movies()
+        plt.hist([movies[i][RATING] for i in movies])
         plt.show()
     
     def byebye(self):
