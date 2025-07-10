@@ -8,14 +8,10 @@ from bin.modules import *
 from os.path import isfile
 from json import load, dumps, JSONDecodeError
 
-class Movie:
-    """
-    Represents a movie with its title, rating, and release year.
+from bin.data_access import add_movie, list_movies
 
-    This class acts as a data model for a movie, providing properties to
-    access and modify its attributes. It stores the actual movie data
-    internally within a dictionary.
-    """
+class Movie:
+
     def __init__(self,movie_data: dict):
         self.movie_data = movie_data
 
@@ -56,7 +52,7 @@ class Movie:
     def release_year(self, value: int):
         self.movie_data['release_year'] = value
     
-
+MAX_RATING = 10
 class MovieRank:
     def __init__(self):
         self.isrunning = True
@@ -102,37 +98,26 @@ class MovieRank:
             print(f"{movie.title:<45} {movie.rating:<7} {movie.release_year}")
             
     def add_movie(self):
-        """
-        Adds a movie to the movies database and saves the new data to `movies.json`.
-        """
+        
         title =  get_user_input_colorized("Movie title: ")
         rating = convert_to_float(get_user_input_colorized("Movie rating: "))
         release_year = convert_to_float(get_user_input_colorized("Movie release year: "))
         
+        #! ERRORHANDLING
         if not title:
             error(MSG_NO_TITLE)
-        
         if release_year < 1891:
             error(MSG_KINETOSSCOPE_NOT_INVENTED_YET)
             return
         if not rating: 
             error(MSG_RATING_IS_NOT_NUMERIC)
             return
-        if rating > 10:
+        if rating > MAX_RATING:
             error(MSG_WRONG_RATING)
             return
         
-        if title not in [i.title for i in self.movies]:
-            
-            temp_movie = Movie(
-                {
-                    "title": title,
-                    'rating': rating,
-                    "release_year": int(release_year)
-                }
-            )
-            self.movies.append(temp_movie)
-        self.save_movies() 
+        if title not in [key for key in list_movies()]:
+            add_movie(title, rating, int(release_year))
     
     def remove_movie(self):
         """
