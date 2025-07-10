@@ -2,20 +2,20 @@ from sqlalchemy import create_engine, text
 
 DB_URL = "sqlite:///movies.db" # Define the database URL
 
-
 engine = create_engine(DB_URL, echo=True) # Create the engine echo prints the sql querys
 
 # Create the movies table if it does not exist
-with engine.connect() as connection:
-    connection.execute(text("""
-        CREATE TABLE IF NOT EXISTS movies (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT UNIQUE NOT NULL,
-            year INTEGER NOT NULL,
-            rating REAL NOT NULL
-        )
-    """))
-    connection.commit()
+def create_database():
+    with engine.connect() as connection:
+        connection.execute(text("""
+            CREATE TABLE IF NOT EXISTS movies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT UNIQUE NOT NULL,
+                year INTEGER NOT NULL,
+                rating REAL NOT NULL
+            )
+        """))
+        connection.commit()
     
 
 def list_movies():
@@ -39,12 +39,28 @@ def add_movie(title, year, rating):
 
 def delete_movie(title):
     """Delete a movie from the database."""
-    pass
+    with engine.connect() as connection:
+        try:
+            connection.execute(text("DELETE FROM movies WHERE title = :title"), 
+                               {"title": title})
+            connection.commit()
+            print(f"Movie '{title}' removed successfully.")
+        except Exception as e:
+            print(f"Error: {e}")
 
 def update_movie(title, rating):
     """Update a movie's rating in the database."""
-    pass
+    with engine.connect() as connection:
+        try:
+            connection.execute(text("UPDATE movies SET title = :title, rating = :rating WHERE title = :title;"), 
+                               {"title": title, "rating": rating})
+            connection.commit()
+            print(f"Movie '{title}' updated successfully.")
+        except Exception as e:
+            print(f"Error: {e}")
 
+
+create_database()
 # Test adding a movie
 add_movie("Inception", 2010, 8.8)
 
