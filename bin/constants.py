@@ -12,6 +12,7 @@ MOVIE_PATH = 'movies\\'
 MAX_RATING = 10
 YEAR = 'year'
 RATING = 'rating'
+POSTER = 'poster'
 
 class APIKeyNotProvidedError(Exception):
     """
