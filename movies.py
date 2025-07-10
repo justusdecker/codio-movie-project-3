@@ -29,9 +29,7 @@ class MovieRank:
     def add_movie(self):
         
         title =  get_user_input_colorized("Movie title: ")
-        #rating = convert_to_float(get_user_input_colorized("Movie rating: "))
-        #release_year = convert_to_float(get_user_input_colorized("Movie release year: "))
-        
+
         #! ERRORHANDLING
         if not title:
             error(MSG_NO_TITLE)
@@ -40,7 +38,7 @@ class MovieRank:
         if movie_data['Response'] == "False":
             error(movie_data['Error'])
             return
-        rating = movie_data['Rated']
+        image = movie_data['Poster']
         
         rating = movie_data['imdbRating']
         if rating == 'N/A':
@@ -52,7 +50,7 @@ class MovieRank:
         release_year = release_date.split(' ')[2]
         
         if title not in [key for key in storage.list_movies()]:
-            storage.add_movie(title, int(release_year),rating)
+            storage.add_movie(title, int(release_year),rating,poster=image)
     
     def remove_movie(self):
         """
@@ -145,6 +143,7 @@ class MovieRank:
         listed = sorted(listed,key=lambda x: x[1],reverse=True)
         for n, r in listed:
             print(f"{r:<35} {n}/10")
+            
     def print_search(self):
         """ 
         a searching method to get movies
@@ -161,6 +160,37 @@ class MovieRank:
         plt.hist([movies[i][RATING] for i in movies])
         plt.show()
     
+    def generate_html(self):
+        
+        with open('_static\\index_template.html') as file_in:
+            html = file_in.read()
+
+        replacer = """
+
+        """
+        movies = storage.list_movies()
+        
+        for movie in movies:
+            replacer += f"""
+<li>
+<div class="movie">
+    <img class="movie-poster" src="{movies[movie][POSTER]}">
+    <div class="movie-title">{movie}</div>
+    <div class="movie-year">{movies[movie][YEAR]}</div>
+</div>
+</li>
+"""
+    
+        html = html.replace('__TEMPLATE_MOVIE_GRID__',replacer)
+        html = html.replace('__TEMPLATE_TITLE__','Movie Project V3')
+        with open('index.html', 'w') as file_out:
+            file_out.write(html)
+            
+        with open('_static\\style.css') as file_in:
+            with open('style.css', 'w') as file_out:
+                file_out.write(file_in.read())
+        print("Website was generated successfully.")
+        
     def byebye(self):
         """ The last thing the app will do before close """
         
@@ -186,6 +216,7 @@ class MovieRank:
             case "7": self.print_search()
             case "8": self.print_movies_by_rank()
             case "9": self.plot_movies()
+            case "10": self.generate_html()
             case _: error(MSG_INVALID_INPUT)         
 
 def main():
@@ -194,15 +225,16 @@ def main():
 ********** My Movies Database **********
 
 Menu:
-1. List movies
-2. Add movie
-3. Delete movie
-4. Update movie
-5. Stats
-6. Random movie
-7. Search movie
-8. Movies sorted by rating
-9. Create Rating Histogram 
+1.  List movies
+2.  Add movie
+3.  Delete movie
+4.  Update movie
+5.  Stats
+6.  Random movie
+7.  Search movie
+8.  Movies sorted by rating
+9.  Create Rating Histogram
+10. Generate Html
         """)
 
         MR.update(get_user_input_colorized("Enter choice 1-9: "))
