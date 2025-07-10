@@ -8,3 +8,23 @@ MSG_NO_TITLE = 'No title given!'
 
 
 MOVIE_PATH = 'movies\\'
+
+MAX_RATING = 10
+YEAR = 'year'
+RATING = 'rating'
+
+class APIKeyNotProvidedError(Exception):
+    """
+Provide an apikey. 
+To do this:
+1. Create a ".env" file in root
+2. enter > apikey={yourkey} & save
+    """
+
+from dotenv import load_dotenv
+from os import getenv
+from bin.modules import error
+loaded = load_dotenv('.env')
+API_KEY = getenv('apikey')
+if not API_KEY or not loaded:
+    raise APIKeyNotProvidedError()
